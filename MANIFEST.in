@@ -1,0 +1,2 @@
+recursive-include django_erd_studio/static *
+include README.md
