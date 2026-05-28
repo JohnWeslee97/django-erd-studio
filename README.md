@@ -1,4 +1,4 @@
-# Django ERD Studio 🎨📊
+# Django ERD Studio 
 
 An interactive, premium web-based Entity-Relationship Diagram (ERD) workbench and database model planner for Django projects. Plan your database schema visually, edit fields, and push code changes directly to your Django application's `models.py` in real-time!
 
@@ -33,7 +33,7 @@ An interactive, premium web-based Entity-Relationship Diagram (ERD) workbench an
 
 ---
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 ### Backend (Python)
 *   **Django (>= 3.2)**: For database model introspection and project-wide metadata management.
@@ -49,7 +49,7 @@ An interactive, premium web-based Entity-Relationship Diagram (ERD) workbench an
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### 1. Installation
 Install the package directly into your active Django environment:
@@ -75,7 +75,7 @@ The server will start locally at **`http://127.0.0.1:8765`** and automatically o
 
 ---
 
-## 📦 Deployment & Clean Building
+## Deployment & Clean Building
 
 This repository is structured according to python packaging best practices. The backend code (`django_erd_studio/`) and frontend workspace (`frontend/`) are perfectly isolated, and Git is protected via a robust `.gitignore` file.
 
