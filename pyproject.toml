@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-erd-studio"
-version = "1.0.4"
+version = "1.1.0"
 description = "Interactive ER Diagram Workbench for Django"
 authors = [
-    { name = "Your Name" }
+    { name = "Johnweslee" }
 ]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -16,6 +16,9 @@ dependencies = [
     "Flask>=2.0",
     "libcst>=1.0",
 ]
+[project.urls]
+Homepage = "https://github.com/JohnWeslee97/django-erd-studio"
+Repository = "https://github.com/JohnWeslee97/django-erd-studio"
 
 [project.scripts]
 django-erd = "django_erd_studio.cli:main"
