@@ -4,24 +4,34 @@ import Toolbar from './components/Toolbar';
 import ToastContainer from './components/Toast';
 import StatsPanel from './components/StatsPanel';
 
+const SYSTEM_APPS = ['auth', 'contenttypes', 'admin', 'sessions', 'messages', 'staticfiles', 'django_erd_studio'];
+
 export default function App() {
   const [schema, setSchema] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
-
+  const [layoutDirection, setLayoutDirection] = useState(() => {
+    return localStorage.getItem('erd_layout_direction') || 'LR';
+  });
   const diagramRef = useRef(null);
 
-  const systemApps = ['auth', 'contenttypes', 'admin', 'sessions', 'messages', 'staticfiles', 'django_erd_studio'];
-  
+  // Filter models based on system apps
   const filteredSchema = useMemo(() => {
     if (!schema) return null;
     
     return Object.fromEntries(
-      Object.entries(schema).filter(([id, model]) => !systemApps.includes(model.app_label))
+      Object.entries(schema).filter(([id, model]) => !SYSTEM_APPS.includes(model.app_label))
     );
   }, [schema]);
+
+  const handleLayoutDirectionChange = (newDirection) => {
+    setLayoutDirection(newDirection);
+    localStorage.setItem('erd_layout_direction', newDirection);
+    // Explicitly request auto-layout in the new direction
+    diagramRef.current?.autoLayout(newDirection);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -103,11 +113,13 @@ export default function App() {
         modelCount={modelCount}
         loading={loading}
         onFitView={() => diagramRef.current?.fitView()}
-        onAutoLayout={() => diagramRef.current?.autoLayout()}
+        onAutoLayout={() => diagramRef.current?.autoLayout(layoutDirection)}
         onExportPNG={() => diagramRef.current?.exportPNG()}
         onExportPDF={() => diagramRef.current?.exportPDF()}
         onSearch={(term) => diagramRef.current?.search(term)}
         onToggleStats={() => setIsStatsOpen(!isStatsOpen)}
+        layoutDirection={layoutDirection}
+        onLayoutDirectionChange={handleLayoutDirectionChange}
       />
 
       <div style={{ flex: 1, width: '100%', position: 'relative' }}>
@@ -115,6 +127,7 @@ export default function App() {
           schema={filteredSchema} 
           ref={diagramRef} 
           onToast={addToast}
+          layoutDirection={layoutDirection}
         />
         <StatsPanel 
           schema={filteredSchema} 

@@ -17,13 +17,14 @@ import TableNode from './TableNode';
 import InteractiveEdge from './InteractiveEdge';
 import EdgeInfoPanel from './EdgeInfoPanel';
 
-const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
+const ERDiagram = forwardRef(({ schema, onToast, layoutDirection = 'LR' }, ref) => {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [rfInstance, setRfInstance] = useState(null);
   const [edgeInfo, setEdgeInfo] = useState(null);
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [zoom, setZoom] = useState(100);
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
 
   const handleZoomIn = () => {
     if (rfInstance) {
@@ -43,6 +44,55 @@ const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
     }
   };
 
+  // Calculate connected nodes on hover to fade out others
+  const connectedNodeIds = useMemo(() => {
+    if (!hoveredNodeId) return new Set();
+    const ids = new Set([hoveredNodeId]);
+    edges.forEach(edge => {
+      if (edge.source === hoveredNodeId) ids.add(edge.target);
+      if (edge.target === hoveredNodeId) ids.add(edge.source);
+    });
+    return ids;
+  }, [hoveredNodeId, edges]);
+
+  // Dynamically styled nodes based on hover state
+  const styledNodes = useMemo(() => {
+    if (!hoveredNodeId) return nodes;
+    return nodes.map(node => {
+      const isConnected = connectedNodeIds.has(node.id);
+      return {
+        ...node,
+        style: {
+          ...node.style,
+          opacity: isConnected ? 1 : 0.22,
+          transition: 'opacity 0.2s ease',
+        }
+      };
+    });
+  }, [nodes, hoveredNodeId, connectedNodeIds]);
+
+  // Dynamically styled edges based on hover state (fading out unrelated, highlighting connected with animation)
+  const styledEdges = useMemo(() => {
+    if (!hoveredNodeId) return edges;
+    return edges.map(edge => {
+      const isConnected = edge.source === hoveredNodeId || edge.target === hoveredNodeId;
+      return {
+        ...edge,
+        animated: isConnected ? true : edge.animated,
+        style: {
+          ...edge.style,
+          strokeWidth: isConnected ? 3 : 1,
+          stroke: isConnected ? '#3b82f6' : (edge.style?.stroke || '#9ca3af'),
+          opacity: isConnected ? 1 : 0.05,
+          transition: 'opacity 0.2s ease, stroke-width 0.2s ease',
+        }
+      };
+    });
+  }, [edges, hoveredNodeId]);
+
+  const onNodeMouseEnter = (event, node) => setHoveredNodeId(node.id);
+  const onNodeMouseLeave = (event, node) => setHoveredNodeId(null);
+
   // Memoize custom node and edge types
   const nodeTypes = useMemo(() => ({ tableNode: TableNode }), []);
   const edgeTypes = useMemo(() => ({ interactiveEdge: InteractiveEdge }), []);
@@ -59,10 +109,19 @@ const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
     fitView: () => {
       if (rfInstance) rfInstance.fitView({ padding: 0.2, duration: 800, minZoom: 0.1, maxZoom: 1.5 });
     },
-    autoLayout: () => {
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements([...nodes], [...edges]);
+    autoLayout: (direction) => {
+      const activeDirection = direction || layoutDirection;
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements([...nodes], [...edges], activeDirection);
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
+      
+      // Save the new layout positions to localStorage
+      const positions = {};
+      layoutedNodes.forEach(n => {
+        positions[n.id] = n.position;
+      });
+      localStorage.setItem('erd_layout_positions', JSON.stringify(positions));
+
       requestAnimationFrame(() => {
         setTimeout(() => rfInstance?.fitView({ padding: 0.15, duration: 600, minZoom: 0.1, maxZoom: 1.5 }), 100);
       });
@@ -80,7 +139,7 @@ const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
     },
     exportPNG: async () => {
       if (!rfInstance) return;
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements([...nodes], [...edges]);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements([...nodes], [...edges], layoutDirection);
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       
@@ -110,7 +169,7 @@ const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
     },
     exportPDF: async () => {
       if (!rfInstance) return;
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements([...nodes], [...edges]);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements([...nodes], [...edges], layoutDirection);
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       
@@ -174,7 +233,7 @@ const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
     }
 
     if (layoutedNodes.length === 0 || layoutedNodes.some(n => n.position.x === 0 && n.position.y === 0)) {
-       const layoutResult = getLayoutedElements(layoutedNodes, layoutedEdges);
+       const layoutResult = getLayoutedElements(layoutedNodes, layoutedEdges, layoutDirection);
        layoutedNodes = layoutResult.nodes;
        layoutedEdges = layoutResult.edges;
     }
@@ -188,7 +247,7 @@ const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
           if (rfInstance) rfInstance.fitView({ padding: 0.2, duration: 800 });
         }, 200);
     }
-  }, [schema, rfInstance]);
+  }, [schema, rfInstance, layoutDirection]);
 
   const onNodesChange = (changes) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
@@ -224,12 +283,14 @@ const ERDiagram = forwardRef(({ schema, onToast }, ref) => {
   return (
     <div style={{ width: '100%', height: '100%', backgroundColor: '#111827', position: 'relative' }}>
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={styledNodes}
+        edges={styledEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
         onPaneClick={onPaneClick}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onInit={(instance) => {
